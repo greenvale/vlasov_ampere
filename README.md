@@ -1,20 +1,45 @@
 # Vlasov-Ampère solvers
 
-![Build](https://img.shields.io/github/actions/workflow/status/username/repo/ci.yml?branch=main)
+<!--![Build](https://img.shields.io/github/actions/workflow/status/username/repo/ci.yml?branch=main)
 ![License](https://img.shields.io/github/license/username/repo)
-![Contributors](https://img.shields.io/github/contributors/username/repo)
+![Contributors](https://img.shields.io/github/contributors/username/repo)-->
 #### Authorship
-The solvers implemented in this project are improved versions of those implemented in the 2022 Final Year Project for MEng Aeronautical Engineering, Imperial College by William Denny. The background details provided here have been have been lifted from the project report. 
+The solvers implemented in this project are slightly improved versions of those implemented in the 2022 Final Year Project for MEng Aeronautical Engineering, Imperial College by William Denny. The background details provided here have been have been lifted from the project report. 
 
 ## Table of Contents
-- [Background](#background)
 - [Usage](#usage)
-- [Examples](#examples)
-- [Contributing](#contributing)
-- [License](#license)
+- [Background](#background)
 - [Requirements](#requirements)
 
 <!-- <!-- mkdir build && cd build -->
+
+
+## Usage
+
+To begin simply clone the repository
+```bash
+git clone https://github.com/greenvale/vlasov-ampere.git
+cd vlasov-ampere
+```
+### Explicit solver
+The explicit solver is implemented by using a ``Species`` class to encapsulate the particle species and solve for their density, momentum, position and velocity. The electric field is then solved seperately and is propagated to each species during each time step.
+
+To run the explicit code on the Landau damping test case, build and run:
+```
+cd explicit
+make
+./main
+```
+
+The data for density, momentum and electric field will be saved in csv files in the working directory. A python animation of this is provided in `plot.py`. You can view this animation by running:
+
+```
+py plot.py
+```
+
+You should see something like this:
+
+![Landau damping explicit](explicit/pic_simulation.gif)
 
 ## Background
 The Vlasov-Amp&egrave;re system of equations can be solved to simulate the behaviour of plasma. This project is concerned with implementing System 2.4 of the Project NEPTUNE specification: solving the Vlasov-Amp&egrave;re system of equations using the kinetic-enslaved particle-in-cell (PIC) implicit moment method (IMM). The Vlasov-Amp&egrave;re equations characterise the velocity distribution of plasma charge carriers, which are solved using the PIC method by simulating charge carriers as 'super particles'.
@@ -56,39 +81,62 @@ $$ \frac{\partial n}{\partial t} + \frac{\partial (nu)}{\partial x} = 0 \quad (1
 
 $$
 
-(11) and (12) are then combined with (8) to get the Vlasov-Amp&egrave;re system of equations as given in [1].
+(11) and (12) are then combined with (8) to get the Vlasov-Amp&egrave;re system of equations as given in [1]. 
+
+### PIC IMM Model
 
 The PIC model represents the velocity distribution as a collection of super particles. In [1], there is an lower-order (LO) system of density, momentum and electric field discretised over a mesh of cells. The higher-order (HO) system is the collection of super particles. The LO system is solved implicitly to obtain the electric field and estimates of the density and momentum. The HO system is solved by integrating the Vlasov equation in the Lagrangian frame of reference for each super particle $p$:
 
 $$\frac{\partial v_p}{\partial t} = \frac{q}{m} E_p \quad (13) \qquad \frac{\partial x_p}{\partial t} = v_p \quad (14) $$
 
+We solve the LO system by solving for $n^{LO}$, $\overline{nu}^{LO}$ and $E^{LO}$. $\overline{nu}$ is the 'time-averaged' momentum which is solved for at time steps $k+\frac{1}{2}$. The time averaged aspect is because in the HO system, the average momentum is accumulated throughout the pushing of the particles, which consists of multiple sub-cycle pushes. The LO system approximates this time averaged momentum with $\overline{nu}$. The density of time-averaged momentum are LO estimates of the HO true values. We need consistency between LO and HO values. [1] achieves this using the consistency parameter $\gamma$. 
 
- The particle moments are accumulated to solve for the electromagnetic field which is discretised over a mesh of cells.
+We assume that there is only one species present. To solve the LO quantities $n^{LO}$, $\overline{nu}^{LO}$, $E^{LO}$, [1] introduces the density normalised-stress tensor $\tilde{S}$ calculated from HO system. We arrive at the following equations
 
- Kinetic-enslavement is the process of coupling the LO and HO systems together. [1] provides details on how this is done. It mostly involves include accumulating the momentum and density from HO system and injecting this into the LO system equations. 
+$$ \frac{\partial n^{LO}}{\partial t} + \frac{\partial}{\partial x}{nu^{LO}} = 0 \qquad (15)$$
+$$\frac{\partial }{\partial t}nu^{LO} +  \frac{\partial }{\partial x}n^{LO}\tilde{S}^{HO} - \frac{q}{m}n^{LO}E = \gamma^{HO}_{nu} n^{LO} \qquad (16)$$
+$$ \epsilon_0 \frac{\partial E}{\partial t} + q \, {nu}^{LO} - \langle q \, {nu}^{LO} \rangle = 0 \qquad (17)$$
 
-## Usage
-To begin simply clone the repository
-```bash
-git clone https://github.com/greenvale/vlasov-ampere.git
-cd vlasov-ampere
-```
-### Explicit solver
-The explicit solver is implemented by using a ``Species`` class to encapsulate the particle species and solve for their density, momentum, position and velocity. The electric field is then solved seperately and is propagated to each species during each time step.
+We follow the discretisation in [1], where momentum and electric field are calculated at cell walls, which are indexed $i+\frac{1}{2}$ for $i=1,\dots,n$ and density and stress are calculated at cell centres, indexed $i$ for $i=1,\dots,n$. 
 
-```cpp
-#include "library.h"
-int main() {
-    simulate();
-}
-```
+The first equation in the LO system is
+
+$$ \frac{n^{LO,k+1}_{i} - n^{HO,k}_{i}}{\Delta t} 
++ \frac{\overline{nu}^{LO,k+\frac{1}{2}}_{i+\frac{1}{2}} - \overline{nu}^{LO,k+\frac{1}{2}}_{i-\frac{1}{2}}}{\Delta x} = 0,
+\qquad (18)
+$$
+where we solve for $n^{LO, k+1}_{i}$ for $i=1,\dots,n$ and $\overline{nu}^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}}$ for $i = 0,\dots,n$. For the next equation we have
+$$ \frac{ \overline{nu}^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}} - nu^{HO,k}_{i+\frac{1}{2}}}{\Delta t / 2}
++ \frac{n^{LO,k+\frac{1}{2}}_{i+1} \tilde{S}^{HO,k+\frac{1}{2}}_{i+1} - n^{LO,k+\frac{1}{2}}_{i} \tilde{S}^{HO,k+\frac{1}{2}}_{i}}{\Delta x}
+- \frac{q}{m}n^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}} E^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}}$$
+$$- \gamma^{HO}_{nu,i+\frac{1}{2}} n^{LO,k+1}_{i+\frac{1}{2}} = 0, \qquad (19)
+$$
+
+where spatially- or temporally-midpoint density/electric field values are calculated from $$n^{LO,k+\frac{1}{2}}_{i} = \frac{1}{2}(n^{LO,k}_{i} + n^{LO,k+1}_{i})$$ $$n^{LO,k+\frac{1}{2}}_{i+1} = \frac{1}{2}(n^{LO,k}_{i+1} + n^{LO,k+1}_{i+1})$$ $$n^{LO,k+\frac{1}{2}}_{i+\frac{1}{2}} = \frac{1}{4}(n^{LO,k}_{i} + n^{LO,k+1}_{i} + n^{LO,k}_{i+1} + n^{LO,k+1}_{i+1})$$ $$E^{LO,k+\frac{1}{2}}_{i+\frac{1}{2}} = \frac{1}{2}(E^{LO,k}_{i+\frac{1}{2}} + E^{LO,k+1}_{i+\frac{1}{2}})$$
+and we are looking to solve for $n^{LO,k+1}_{i}$, $\overline{nu}^{k+\frac{1}{2}}_{i+\frac{1}{2}}$ and $E^{LO, k+1}_{i+\frac{1}{2}}$.
+Finally the Amp&egrave;re equation is solved via
+
+$$
+\epsilon_0 \frac{E^{LO, k+1}_{i+\frac{1}{2}} - E^{LO, k}_{i+\frac{1}{2}}}{\Delta t} - q \, \overline{nu}^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}} - \langle q\, \overline{nu}^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}} \rangle = 0, \qquad (20)
+$$
+where we are solving for $\overline{nu}^{k+\frac{1}{2}}_{i+\frac{1}{2}}$ and $E^{LO, k+1}_{i+\frac{1}{2}}$.
+
+The formulas for the density-normalised stress tensor $\tilde{S}$ and consistency parameter $\gamma$ are given by
+
+$$ \tilde{S}_{i}^{HO, k+\frac{1}{2}} = \frac{S^{HO, k}_{i} + S^{HO, k+1}_{i}}{n^{HO, k}_{i} + n^{HO, k+1}_{i}} \qquad (21)$$
+
+$$ \gamma^{HO}_{nu, i+\frac{1}{2}} = \frac{1}{n^{HO, k+1}_{i+\frac{1}{2}}}\left( 
+\frac{ \overline{nu}^{HO, k+\frac{1}{2}}_{i+\frac{1}{2}} - nu^{HO,k}_{i+\frac{1}{2}}}{\Delta t / 2}
++ \frac{n^{HO,k+\frac{1}{2}}_{i+1} \tilde{S}^{HO,k+\frac{1}{2}}_{i+1} - n^{HO,k+\frac{1}{2}}_{i} \tilde{S}^{HO,k+\frac{1}{2}}_{i}}{\Delta x}
+- \frac{q}{m}n^{HO, k+\frac{1}{2}}_{i+\frac{1}{2}} E^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}}
+\right) \qquad (22)$$
+
+Note that (22) is derived from (19) by swapping the LO density and time-averaged momentum with the HO counterparts. Note that this is still a function of unknown $E^{LO, k+1}_{i+\frac{1}{2}}$. 
 
 ## Requirements
 
 This project requires an NVidia GPU with compute capability &ge; 6.0. CUDA Toolkit &ge; 12.0 must also be installed to run the ``nvcc`` compiler.
 
-## Demo
-![Simulation gif](docs/demo.gif)
 
 ### References
 
