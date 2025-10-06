@@ -41,6 +41,22 @@ You should see something like this:
 
 ![Landau damping explicit](explicit/pic_simulation.gif)
 
+
+### Implicit Moment Method solver ###
+
+The IMM project has a `main.cpp` file that contains a Landau damping test. Build this test using:
+
+```
+cd implicit
+mkdir output
+make
+./bin/plas
+```
+
+The output data is stored in csv files in `output` directory. Running `plot.py` will produce this animation:
+
+![Landau damping explicit](implicit/imm_simulation.gif)
+
 ## Background
 The Vlasov-Amp&egrave;re system of equations can be solved to simulate the behaviour of plasma. This project is concerned with implementing System 2.4 of the Project NEPTUNE specification: solving the Vlasov-Amp&egrave;re system of equations using the kinetic-enslaved particle-in-cell (PIC) implicit moment method (IMM). The Vlasov-Amp&egrave;re equations characterise the velocity distribution of plasma charge carriers, which are solved using the PIC method by simulating charge carriers as 'super particles'.
 
@@ -77,13 +93,11 @@ $$\frac{\partial f}{\partial t} + v \frac{\partial f}{\partial x} + \frac{q}{m} 
 where $m$ is the particle mass. Taking the zeroth and first moments of the Vlasov equation returns the continuity and momentum conservation equations:
 
 $$ \frac{\partial n}{\partial t} + \frac{\partial (nu)}{\partial x} = 0 \quad (11) \qquad 
-\frac{\partial (nu)}{\partial t} + \frac{\partial S}{\partial x} - \frac{q}{m} n E \quad (12)
-
-$$
+\frac{\partial (nu)}{\partial t} + \frac{\partial S}{\partial x} - \frac{q}{m} n E \quad (12)$$
 
 (11) and (12) are then combined with (8) to get the Vlasov-Amp&egrave;re system of equations as given in [1]. 
 
-### PIC IMM Model
+<!--### PIC IMM Model
 
 The PIC model represents the velocity distribution as a collection of super particles. In [1], there is an lower-order (LO) system of density, momentum and electric field discretised over a mesh of cells. The higher-order (HO) system is the collection of super particles. The LO system is solved implicitly to obtain the electric field and estimates of the density and momentum. The HO system is solved by integrating the Vlasov equation in the Lagrangian frame of reference for each super particle $p$:
 
@@ -131,7 +145,7 @@ $$ \gamma^{HO}_{nu, i+\frac{1}{2}} = \frac{1}{n^{HO, k+1}_{i+\frac{1}{2}}}\left(
 - \frac{q}{m}n^{HO, k+\frac{1}{2}}_{i+\frac{1}{2}} E^{LO, k+\frac{1}{2}}_{i+\frac{1}{2}}
 \right) \qquad (22)$$
 
-Note that (22) is derived from (19) by swapping the LO density and time-averaged momentum with the HO counterparts. Note that this is still a function of unknown $E^{LO, k+1}_{i+\frac{1}{2}}$. 
+Note that (22) is derived from (19) by swapping the LO density and time-averaged momentum with the HO counterparts. Note that this is still a function of unknown $E^{LO, k+1}_{i+\frac{1}{2}}$. -->
 
 ## Requirements
 
@@ -140,5 +154,5 @@ This project requires an NVidia GPU with compute capability &ge; 6.0. CUDA Toolk
 
 ### References
 
-[1] Smith, J., et al., *A Fast CUDA Particle Simulator*, Journal of Computational Physics, 2020. [Link](https://doi.org/10.1000/exampledoi)  
-[2] Doe, A., *GPU-Accelerated Simulations*, Conference on HPC, 2019. [Link](https://doi.org/10.1001/exampledoi)
+[1] Taitano WT, Knoll DA, Chac´on L, Chen G. Development of a Consistent and Stable Fully Implicit Moment Method for Vlasov-Amp`ere Particle in Cell (PIC) System. SIAM Journal on Scientific Computing. 2013:pages 126-49.
+[2] Bellan PM. Fundamentals of Plasma Physics. Cambridge University Press; 2006.
